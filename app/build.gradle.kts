@@ -193,6 +193,7 @@ dependencies {
 
     // ML Kit
     implementation(libs.mlkit.image.labeling)
+    implementation(libs.mlkit.face.detection)
 
     // CameraX
     implementation(libs.bundles.camerax)
