@@ -1,0 +1,191 @@
+# Firebase Test Lab Configuration
+# This file defines test matrix configurations for running instrumentation tests
+# on Firebase Test Lab with various device configurations.
+
+# Test matrix configuration
+test-matrix:
+  # Test type
+  type: instrumentation
+  
+  # App and test APK paths (will be overridden by CI/CD)
+  app-apk: app/build/outputs/apk/debug/app-debug.apk
+  test-apk: app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+  
+  # Device configurations
+  devices:
+    # Pixel 2 - Android 8.0 (API 26) - Minimum supported version
+    - model: Pixel2
+      version: 26
+      locale: en
+      orientation: portrait
+    
+    # Pixel 2 - Android 9.0 (API 28)
+    - model: Pixel2
+      version: 28
+      locale: en
+      orientation: portrait
+    
+    # Pixel 3 - Android 10 (API 29)
+    - model: Pixel3
+      version: 29
+      locale: en
+      orientation: portrait
+    
+    # Pixel 4 - Android 11 (API 30)
+    - model: Pixel4
+      version: 30
+      locale: en
+      orientation: portrait
+    
+    # Pixel 5 - Android 12 (API 31)
+    - model: Pixel5
+      version: 31
+      locale: en
+      orientation: portrait
+    
+    # Pixel 6 - Android 13 (API 33)
+    - model: Pixel6
+      version: 33
+      locale: en
+      orientation: portrait
+    
+    # Samsung Galaxy S21 - Android 11 (API 30)
+    - model: oriole
+      version: 30
+      locale: en
+      orientation: portrait
+    
+    # Tablet configuration
+    - model: Nexus9
+      version: 28
+      locale: en
+      orientation: landscape
+  
+  # Test execution settings
+  timeout: 30m
+  
+  # Test sharding (distribute tests across multiple devices)
+  num-uniform-shards: 4
+  
+  # Environment variables
+  environment-variables:
+    - key: clearPackageData
+      value: true
+    - key: coverage
+      value: true
+  
+  # Directories to pull from device after test
+  directories-to-pull:
+    - /sdcard/screenshots
+    - /sdcard/coverage
+  
+  # Test targets (optional - run specific tests)
+  # test-targets:
+  #   - class com.healthtracker.OnboardingFlowTest
+  #   - class com.healthtracker.DashboardScreenTest
+  
+  # Performance metrics
+  performance-metrics: true
+  
+  # Video recording
+  record-video: true
+  
+  # Results storage
+  results-bucket: gs://health-tracker-test-results
+  results-history-name: health-tracker-tests
+
+# Robo test configuration (for exploratory testing)
+robo-test:
+  enabled: true
+  max-depth: 50
+  max-steps: 1000
+  
+  # Robo directives (guide the test)
+  robo-directives:
+    - type: click
+      resource-name: com.healthtracker:id/continue_button
+    - type: text
+      resource-name: com.healthtracker:id/name_input
+      input-text: Test User
+
+# Test loop configuration (for game loop testing)
+test-loop:
+  enabled: false
+
+# Network profiles
+network-profiles:
+  - id: LTE
+  - id: 3G
+  - id: EDGE
+
+# Additional test configurations
+additional-configs:
+  # Test for different locales
+  locales:
+    - en
+    - es
+    - fr
+    - de
+    - ja
+    - zh
+  
+  # Test for different orientations
+  orientations:
+    - portrait
+    - landscape
+  
+  # Test with different system settings
+  system-settings:
+    - key: wifi
+      value: on
+    - key: bluetooth
+      value: off
+    - key: location
+      value: on
+
+# Flaky test handling
+flaky-test-attempts: 3
+
+# Test result notifications
+notifications:
+  enabled: true
+  channels:
+    - email
+    - slack
+
+# Cost optimization
+cost-optimization:
+  # Use virtual devices when possible
+  prefer-virtual-devices: true
+  
+  # Limit test duration
+  max-test-duration: 30m
+  
+  # Skip redundant tests
+  skip-redundant-tests: true
+
+# Accessibility testing
+accessibility:
+  enabled: true
+  checks:
+    - contrast-ratio
+    - touch-target-size
+    - content-description
+
+# Performance testing
+performance:
+  enabled: true
+  metrics:
+    - cpu-usage
+    - memory-usage
+    - network-usage
+    - battery-drain
+    - frame-rate
+
+# Security testing
+security:
+  enabled: true
+  checks:
+    - ssl-pinning
+    - data-encryption
+    - secure-storage

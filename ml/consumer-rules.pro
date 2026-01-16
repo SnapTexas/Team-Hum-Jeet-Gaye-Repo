@@ -1,0 +1,5 @@
+# Consumer rules for ml module
+
+-keep class org.tensorflow.lite.** { *; }
+-keep class com.google.mlkit.** { *; }
+-keep class com.healthtracker.ml.** { *; }

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary Colors -->
+    <color name="primary">#00D4FF</color>
+    <color name="primary_variant">#0099CC</color>
+    <color name="on_primary">#FFFFFF</color>
+    
+    <!-- Secondary Colors -->
+    <color name="secondary">#8B5CF6</color>
+    <color name="secondary_variant">#6D28D9</color>
+    <color name="on_secondary">#FFFFFF</color>
+    
+    <!-- Accent Colors -->
+    <color name="accent">#10B981</color>
+    <color name="accent_variant">#059669</color>
+    
+    <!-- Background Colors -->
+    <color name="background">#FFFFFF</color>
+    <color name="surface">#F8FAFC</color>
+    <color name="on_background">#1E293B</color>
+    <color name="on_surface">#334155</color>
+    
+    <!-- Error Colors -->
+    <color name="error">#EF4444</color>
+    <color name="on_error">#FFFFFF</color>
+    
+    <!-- Success Colors -->
+    <color name="success">#22C55E</color>
+    
+    <!-- Warning Colors -->
+    <color name="warning">#F59E0B</color>
+    
+    <!-- Glow Effect -->
+    <color name="glow">#33FFFFFF</color>
+</resources>
