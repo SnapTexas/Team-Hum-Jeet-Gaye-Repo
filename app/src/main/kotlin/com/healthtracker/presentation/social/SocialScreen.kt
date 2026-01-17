@@ -203,6 +203,14 @@ fun SocialScreen(
             override fun onCancelled(error: DatabaseError) { isLoading = false }
         }
         circlesRef.addValueEventListener(listener)
+        
+        // Timeout - if Firebase doesn't respond in 5 seconds, stop loading
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            if (isLoading) {
+                isLoading = false
+            }
+        }, 5000)
+        
         onDispose { circlesRef.removeEventListener(listener) }
     }
     
@@ -245,23 +253,6 @@ fun SocialScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
-        },
-        floatingActionButton = {
-            Column(horizontalAlignment = Alignment.End) {
-                FloatingActionButton(
-                    onClick = { showJoinDialog = true },
-                    containerColor = ElectricBlue,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                ) {
-                    Icon(Icons.Default.PersonAdd, "Join Circle", tint = Color.White)
-                }
-                FloatingActionButton(
-                    onClick = { showCreateDialog = true },
-                    containerColor = NeonPurple
-                ) {
-                    Icon(Icons.Default.Add, "Create Circle", tint = Color.White)
-                }
-            }
         }
     ) { padding ->
         Box(
@@ -452,41 +443,71 @@ private fun MyProfileCard(userName: String, visibleUserId: String, endorsementCo
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Avatar
-                Surface(
-                    shape = CircleShape,
-                    color = NeonPurple.copy(alpha = 0.2f),
-                    modifier = Modifier.size(60.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Avatar - Fixed size
+                Box(
+                    modifier = Modifier
+                        .size(60.dp)
+                        .clip(CircleShape)
+                        .background(NeonPurple.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Text("👤", fontSize = 30.sp)
-                    }
+                    Text("👤", fontSize = 30.sp)
                 }
                 
                 Spacer(modifier = Modifier.width(16.dp))
                 
+                // Name and ID
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(userName, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 20.sp)
-                        IconButton(onClick = onEditName, modifier = Modifier.size(24.dp)) {
-                            Icon(Icons.Default.Edit, null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = userName, 
+                            fontWeight = FontWeight.Bold, 
+                            color = Color.White, 
+                            fontSize = 20.sp,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        IconButton(
+                            onClick = onEditName, 
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Edit, 
+                                null, 
+                                tint = Color.White.copy(alpha = 0.5f), 
+                                modifier = Modifier.size(16.dp)
+                            )
                         }
                     }
-                    Text("ID: $visibleUserId...", color = Color.White.copy(alpha = 0.4f), fontSize = 12.sp)
+                    Text(
+                        text = "ID: $visibleUserId...", 
+                        color = Color.White.copy(alpha = 0.4f), 
+                        fontSize = 12.sp
+                    )
                 }
             }
             
             Spacer(modifier = Modifier.height(16.dp))
             
             // Endorsement Badge
-            Surface(
+            Card(
                 shape = RoundedCornerShape(12.dp),
-                color = if (endorsementCount > 0) CyberGreen.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.1f),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (endorsementCount > 0) CyberGreen.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.1f)
+                ),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center
                 ) {
@@ -526,21 +547,35 @@ private fun EmptyCirclesCard(onCreateClick: () -> Unit, onJoinClick: () -> Unit)
             Text("👥", fontSize = 48.sp)
             Spacer(modifier = Modifier.height(12.dp))
             Text("No Circles Yet", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 18.sp)
-            Text("Create or join a circle to connect with friends!", 
-                color = Color.White.copy(alpha = 0.6f), textAlign = TextAlign.Center, fontSize = 14.sp)
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "Create or join a circle to connect with friends!", 
+                color = Color.White.copy(alpha = 0.6f), 
+                textAlign = TextAlign.Center, 
+                fontSize = 14.sp
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            
+            // Buttons in a proper row with spacing
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 OutlinedButton(
                     onClick = onJoinClick,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = ElectricBlue)
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = ElectricBlue),
+                    modifier = Modifier.weight(1f).padding(end = 8.dp)
                 ) {
                     Icon(Icons.Default.PersonAdd, null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Join")
+                    Text("Join Circle")
                 }
+                
                 Button(
                     onClick = onCreateClick,
-                    colors = ButtonDefaults.buttonColors(containerColor = NeonPurple)
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonPurple),
+                    modifier = Modifier.weight(1f).padding(start = 8.dp)
                 ) {
                     Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))

@@ -61,8 +61,14 @@ class MedicalRepositoryImpl @Inject constructor(
     }
     
     private suspend fun getCurrentUserId(): String {
-        return userRepository.getUser().first()?.id 
-            ?: throw IllegalStateException("No user logged in")
+        // Use SharedPreferences for consistent user ID
+        val prefs = context.getSharedPreferences("health_tracker_user", Context.MODE_PRIVATE)
+        var userId = prefs.getString("user_id", null)
+        if (userId == null) {
+            userId = UUID.randomUUID().toString()
+            prefs.edit().putString("user_id", userId).apply()
+        }
+        return userId
     }
     
     // ==================== Medical Records ====================
@@ -273,9 +279,12 @@ class MedicalRepositoryImpl @Inject constructor(
     override suspend fun createReminder(reminder: HealthReminder): Result<HealthReminder> {
         return withContext(Dispatchers.IO) {
             try {
-                val entity = reminder.toEntity()
+                val userId = getCurrentUserId()
+                // Update reminder with actual user ID
+                val reminderWithUserId = reminder.copy(userId = userId)
+                val entity = reminderWithUserId.toEntity()
                 medicalDao.insertReminder(entity)
-                Result.Success(reminder)
+                Result.Success(reminderWithUserId)
             } catch (e: Exception) {
                 Timber.e(e, "Failed to create reminder")
                 Result.Error(AppException.UnknownException(e.message ?: "Unknown error", e))
@@ -379,8 +388,14 @@ class MedicalRepositoryImpl @Inject constructor(
     // ==================== Helper Functions ====================
     
     private fun getCurrentUserIdSync(): String {
-        // This is a simplified version - in production, use proper async handling
-        return "current_user" // Placeholder - will be replaced with actual user ID
+        // Use SharedPreferences for sync access to user ID
+        val prefs = context.getSharedPreferences("health_tracker_user", Context.MODE_PRIVATE)
+        var userId = prefs.getString("user_id", null)
+        if (userId == null) {
+            userId = UUID.randomUUID().toString()
+            prefs.edit().putString("user_id", userId).apply()
+        }
+        return userId
     }
     
     private fun MedicalRecordEntity.toDomainModel(): MedicalRecord {

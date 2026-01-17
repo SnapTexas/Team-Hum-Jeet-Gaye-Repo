@@ -1,5 +1,6 @@
 package com.healthtracker.presentation.main
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,12 +20,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.SelfImprovement
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.LocalHospital
 import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.Restaurant
@@ -42,6 +46,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -50,6 +55,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.healthtracker.presentation.dashboard.DashboardScreen
@@ -58,12 +64,15 @@ import com.healthtracker.presentation.gamification.GamificationScreen
 import com.healthtracker.presentation.medical.MedicalScreen
 import com.healthtracker.presentation.mentalhealth.MentalHealthScreen
 import com.healthtracker.presentation.planning.PlanningScreen
+import com.healthtracker.presentation.progress.ProgressScreen
 import com.healthtracker.presentation.social.SocialScreen
 import com.healthtracker.presentation.triage.TriageScreen
+import com.healthtracker.presentation.avatar.FloatingAvatarOverlay
 import com.healthtracker.presentation.theme.ElectricBlue
 import com.healthtracker.presentation.theme.NeonPurple
 import com.healthtracker.presentation.theme.CyberGreen
 import com.healthtracker.presentation.theme.GlassSurface
+import com.healthtracker.service.avatar.AvatarOverlayService
 
 /**
  * Bottom navigation items for the main screen - PRD Features mapped:
@@ -86,7 +95,8 @@ sealed class BottomNavItem(
 ) {
     data object Home : BottomNavItem("home", "Home", Icons.Filled.Home, Icons.Outlined.Home)
     data object Diet : BottomNavItem("diet", "Diet", Icons.Filled.Restaurant, Icons.Outlined.Restaurant)
-    data object Mental : BottomNavItem("mental", "Wellness", Icons.Filled.SelfImprovement, Icons.Outlined.SelfImprovement)
+    data object Mood : BottomNavItem("mood", "Mood", Icons.Filled.SelfImprovement, Icons.Outlined.SelfImprovement)
+    data object Progress : BottomNavItem("progress", "Progress", Icons.Filled.Insights, Icons.Outlined.Insights)
     data object Social : BottomNavItem("social", "Social", Icons.Filled.People, Icons.Outlined.People)
     data object Medical : BottomNavItem("medical", "Medical", Icons.Filled.LocalHospital, Icons.Outlined.LocalHospital)
 }
@@ -94,7 +104,8 @@ sealed class BottomNavItem(
 val bottomNavItems = listOf(
     BottomNavItem.Home,
     BottomNavItem.Diet,
-    BottomNavItem.Mental,
+    BottomNavItem.Mood,
+    BottomNavItem.Progress,
     BottomNavItem.Social,
     BottomNavItem.Medical
 )
@@ -103,12 +114,13 @@ val bottomNavItems = listOf(
 enum class ExtendedTab {
     DASHBOARD,      // F03: Analytics
     DIET,           // F08: CV Diet Tracking
-    MENTAL,         // F09: Mental Health
+    PROGRESS,       // Progress Charts
     SOCIAL,         // F11: Health Circles
     MEDICAL,        // F12+F13: Triage + Records
     GAMIFICATION,   // F10: Goals & Badges
     PLANNING,       // F07: Personalized Plans
-    TRIAGE          // F12: Health Issue Detection
+    TRIAGE,         // F12: Health Issue Detection
+    MENTAL          // F09: Mental Health
 }
 
 /**
@@ -122,8 +134,14 @@ fun MainScreen(
     onNavigateToTriage: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     var selectedIndex by rememberSaveable { mutableIntStateOf(0) }
     var currentTab by rememberSaveable { mutableIntStateOf(0) } // For extended navigation
+    
+    // Avatar overlay service state
+    var isAvatarServiceRunning by rememberSaveable { 
+        mutableStateOf(AvatarOverlayService.hasOverlayPermission(context))
+    }
     
     val gradientBackground = Brush.verticalGradient(
         colors = listOf(
@@ -145,23 +163,47 @@ fun MainScreen(
                     currentTab = when(it) {
                         0 -> 0 // Dashboard
                         1 -> 1 // Diet
-                        2 -> 2 // Mental
-                        3 -> 3 // Social
-                        4 -> 4 // Medical
+                        2 -> 8 // Mood (Mental Health)
+                        3 -> 2 // Progress
+                        4 -> 3 // Social
+                        5 -> 4 // Medical
                         else -> 0
                     }
                 }
             )
         },
         floatingActionButton = {
-            // AI Avatar FAB (F06: Floating AI Avatar)
+            // AI Avatar FAB - Start/Stop overlay service
             FloatingActionButton(
-                onClick = onNavigateToAvatar,
-                containerColor = ElectricBlue,
+                onClick = { 
+                    if (AvatarOverlayService.hasOverlayPermission(context)) {
+                        if (isAvatarServiceRunning) {
+                            AvatarOverlayService.stop(context)
+                            isAvatarServiceRunning = false
+                            // Save preference
+                            context.getSharedPreferences("avatar_settings", Context.MODE_PRIVATE)
+                                .edit().putBoolean("avatar_enabled", false).apply()
+                        } else {
+                            AvatarOverlayService.start(context)
+                            isAvatarServiceRunning = true
+                            // Save preference
+                            context.getSharedPreferences("avatar_settings", Context.MODE_PRIVATE)
+                                .edit().putBoolean("avatar_enabled", true).apply()
+                        }
+                    } else {
+                        // Request overlay permission
+                        AvatarOverlayService.requestOverlayPermission(context)
+                    }
+                },
+                containerColor = if (isAvatarServiceRunning) ElectricBlue else Color(0xFF1A1A2E),
                 contentColor = Color.White,
                 shape = CircleShape
             ) {
-                Text("🤖", style = MaterialTheme.typography.headlineSmall)
+                Icon(
+                    imageVector = Icons.Default.SmartToy,
+                    contentDescription = "AI Assistant",
+                    modifier = Modifier.size(28.dp)
+                )
             }
         }
     ) { paddingValues ->
@@ -192,12 +234,13 @@ fun MainScreen(
                     }
                 }
                 1 -> DietTrackingScreen(onNavigateBack = { selectedIndex = 0; currentTab = 0 })
-                2 -> MentalHealthScreen(onNavigateBack = { selectedIndex = 0; currentTab = 0 })
+                2 -> ProgressScreen(onNavigateBack = { selectedIndex = 0; currentTab = 0 }) // Progress Charts
                 3 -> SocialScreen(onNavigateToCircleDetail = {})
                 4 -> MedicalScreen(onNavigateBack = { selectedIndex = 0; currentTab = 0 })
                 5 -> GamificationScreen() // F10: Gamification
                 6 -> PlanningScreen()     // F07: Planning
                 7 -> TriageScreen(onNavigateBack = { selectedIndex = 0; currentTab = 0 }) // F12: Triage
+                8 -> MentalHealthScreen(onNavigateBack = { selectedIndex = 0; currentTab = 0 }) // F09: Mental
             }
         }
     }
@@ -256,6 +299,7 @@ private fun QuickAccessCard(
 ) {
     Card(
         modifier = modifier
+            .height(90.dp)
             .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
@@ -264,8 +308,11 @@ private fun QuickAccessCard(
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             Icon(
                 imageVector = icon,
@@ -278,7 +325,8 @@ private fun QuickAccessCard(
                 text = title,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = Color.White,
+                maxLines = 1
             )
         }
     }
@@ -309,7 +357,8 @@ private fun GlassmorphicBottomNav(
                 label = {
                     Text(
                         text = item.title,
-                        style = MaterialTheme.typography.labelSmall
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1
                     )
                 },
                 colors = NavigationBarItemDefaults.colors(

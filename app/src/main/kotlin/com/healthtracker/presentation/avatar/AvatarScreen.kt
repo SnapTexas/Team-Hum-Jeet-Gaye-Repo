@@ -68,6 +68,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.ImageLoader
+import coil.compose.AsyncImage
+import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
+import coil.request.ImageRequest
+import android.os.Build
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
@@ -263,6 +271,8 @@ private fun AvatarVisualization(
     state: AvatarState,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    
     Box(
         modifier = modifier,
         contentAlignment = Alignment.Center
@@ -310,10 +320,30 @@ private fun AvatarVisualization(
                         PulsingMicIcon()
                     }
                     else -> {
-                        // Avatar emoji/icon
-                        Text(
-                            text = "🤖",
-                            fontSize = 64.sp
+                        // Animated GIF Avatar
+                        val context = LocalContext.current
+                        val imageLoader = remember {
+                            ImageLoader.Builder(context)
+                                .components {
+                                    if (Build.VERSION.SDK_INT >= 28) {
+                                        add(ImageDecoderDecoder.Factory())
+                                    } else {
+                                        add(GifDecoder.Factory())
+                                    }
+                                }
+                                .build()
+                        }
+                        
+                        AsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data(com.healthtracker.R.drawable.avatar_animation)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = "Avatar Animation",
+                            imageLoader = imageLoader,
+                            modifier = Modifier
+                                .size(120.dp)
+                                .clip(CircleShape)
                         )
                     }
                 }
@@ -655,6 +685,7 @@ fun FloatingAvatarButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val infiniteTransition = rememberInfiniteTransition(label = "float")
     val offsetY by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -708,10 +739,29 @@ fun FloatingAvatarButton(
                 )
         )
         
-        // Avatar icon
-        Text(
-            text = "🤖",
-            fontSize = 32.sp
+        // Animated GIF Avatar
+        val imageLoader = remember {
+            ImageLoader.Builder(context)
+                .components {
+                    if (Build.VERSION.SDK_INT >= 28) {
+                        add(ImageDecoderDecoder.Factory())
+                    } else {
+                        add(GifDecoder.Factory())
+                    }
+                }
+                .build()
+        }
+        
+        AsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(com.healthtracker.R.drawable.avatar_animation)
+                .crossfade(true)
+                .build(),
+            contentDescription = "Avatar",
+            imageLoader = imageLoader,
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
         )
     }
 }

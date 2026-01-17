@@ -13,6 +13,7 @@ import com.healthtracker.presentation.gamification.GamificationScreen
 import com.healthtracker.presentation.main.MainScreen
 import com.healthtracker.presentation.onboarding.OnboardingScreen
 import com.healthtracker.presentation.planning.PlanningScreen
+import com.healthtracker.presentation.progress.ProgressScreen
 import com.healthtracker.presentation.social.CircleDetailScreen
 import com.healthtracker.presentation.splash.SplashScreen
 import com.healthtracker.presentation.triage.TriageScreen
@@ -28,6 +29,7 @@ object Routes {
     const val GAMIFICATION = "gamification"
     const val PLANNING = "planning"
     const val TRIAGE = "triage"
+    const val PROGRESS = "progress"
     const val CIRCLE_DETAIL = "circle_detail/{circleId}"
     
     fun circleDetail(circleId: String) = "circle_detail/$circleId"
@@ -128,6 +130,15 @@ fun HealthTrackerNavHost(
         // Triage screen (F12: Health Issue Detection)
         composable(Routes.TRIAGE) {
             TriageScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+        
+        // Progress screen - User progress with charts
+        composable(Routes.PROGRESS) {
+            ProgressScreen(
                 onNavigateBack = {
                     navController.popBackStack()
                 }

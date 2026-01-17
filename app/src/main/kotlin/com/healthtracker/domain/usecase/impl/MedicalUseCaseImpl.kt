@@ -29,7 +29,8 @@ import javax.inject.Singleton
 @Singleton
 class MedicalUseCaseImpl @Inject constructor(
     private val medicalRepository: MedicalRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val notificationService: com.healthtracker.service.notification.MedicalReminderNotificationService
 ) : MedicalUseCase {
     
     override fun getMedicalRecords(): Flow<List<MedicalRecord>> {
@@ -162,12 +163,9 @@ class MedicalUseCaseImpl @Inject constructor(
             return Result.Error(AppException.ValidationException("validation", scheduleValidation.reason))
         }
         
-        val user = userRepository.getUser().first()
-            ?: return Result.Error(AppException.StorageException("No user logged in"))
-        
         val reminder = HealthReminder(
             id = UUID.randomUUID().toString(),
-            userId = user.id,
+            userId = "current_user", // Will be replaced by repository with actual user ID
             type = type,
             title = title.trim(),
             description = description?.trim(),
@@ -230,10 +228,17 @@ class MedicalUseCaseImpl @Inject constructor(
     }
     
     override suspend fun scheduleReminderNotifications(reminderId: String): Result<Int> {
-        return Result.Success(0)
+        return when (val reminderResult = medicalRepository.getReminder(reminderId)) {
+            is Result.Success -> {
+                val count = notificationService.scheduleReminder(reminderResult.data)
+                Result.Success(count)
+            }
+            is Result.Error -> Result.Error(reminderResult.exception)
+        }
     }
     
     override suspend fun cancelReminderNotifications(reminderId: String): Result<Unit> {
+        notificationService.cancelReminder(reminderId)
         return Result.Success(Unit)
     }
     

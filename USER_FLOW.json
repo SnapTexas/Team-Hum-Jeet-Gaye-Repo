@@ -1,0 +1,666 @@
+{
+  "app_name": "YouFit Health Tracker",
+  "version": "1.0.0",
+  "user_flow": {
+    "1_app_launch": {
+      "screen": "Splash Screen",
+      "duration": "2-3 seconds",
+      "description": "App logo with loading animation",
+      "next_steps": [
+        {
+          "condition": "First time user",
+          "goto": "2_onboarding"
+        },
+        {
+          "condition": "Returning user",
+          "goto": "3_main_dashboard"
+        }
+      ]
+    },
+    
+    "2_onboarding": {
+      "screen": "Onboarding Flow",
+      "steps": [
+        {
+          "step": 1,
+          "title": "Welcome",
+          "description": "Introduction to YouFit features",
+          "actions": ["Next", "Skip"]
+        },
+        {
+          "step": 2,
+          "title": "Health Permissions",
+          "description": "Request permissions for health data, camera, location",
+          "permissions": ["Health Connect", "Camera", "Location", "Notifications"],
+          "actions": ["Allow", "Deny"]
+        },
+        {
+          "step": 3,
+          "title": "Profile Setup",
+          "description": "Enter basic info: name, age, weight, height, goals",
+          "actions": ["Complete", "Skip"]
+        }
+      ],
+      "next": "3_main_dashboard"
+    },
+    
+    "3_main_dashboard": {
+      "screen": "Home Dashboard",
+      "description": "Main screen with health overview",
+      "components": {
+        "top_section": {
+          "quick_access_cards": [
+            {
+              "name": "Achievements",
+              "icon": "Trophy",
+              "color": "Gold",
+              "action": "goto: 8_gamification"
+            },
+            {
+              "name": "Plans",
+              "icon": "Calendar",
+              "color": "Green",
+              "action": "goto: 9_planning"
+            },
+            {
+              "name": "Symptoms",
+              "icon": "Medical",
+              "color": "Red",
+              "action": "goto: 10_triage"
+            }
+          ]
+        },
+        "main_content": {
+          "health_cards": [
+            {
+              "name": "Steps Today",
+              "value": "8,542 / 10,000",
+              "action": "goto: 4_progress"
+            },
+            {
+              "name": "Calories Burned",
+              "value": "420 kcal",
+              "action": "goto: 4_progress"
+            },
+            {
+              "name": "Sleep",
+              "value": "7h 30m",
+              "action": "goto: 4_progress"
+            },
+            {
+              "name": "Water Intake",
+              "value": "6 / 8 glasses",
+              "action": "Quick log water"
+            }
+          ],
+          "ai_suggestions": {
+            "description": "AI-powered health tips",
+            "example": "You're 1,458 steps away from your goal!",
+            "action": "goto: 11_ai_chat"
+          }
+        },
+        "floating_button": {
+          "name": "AI Avatar",
+          "icon": "Robot",
+          "action": "Toggle AI overlay assistant"
+        }
+      },
+      "bottom_navigation": {
+        "tabs": [
+          {"name": "Home", "active": true, "goto": "3_main_dashboard"},
+          {"name": "Diet", "goto": "5_diet"},
+          {"name": "Mood", "goto": "7_mental_health"},
+          {"name": "Progress", "goto": "4_progress"},
+          {"name": "Social", "goto": "6_social"},
+          {"name": "Medical", "goto": "12_medical"}
+        ]
+      }
+    },
+    
+    "4_progress": {
+      "screen": "Progress & Analytics",
+      "description": "Detailed charts and statistics",
+      "tabs": [
+        {
+          "name": "Daily",
+          "charts": ["Steps", "Calories", "Heart Rate", "Sleep"]
+        },
+        {
+          "name": "Weekly",
+          "charts": ["Weekly trends", "Goal completion"]
+        },
+        {
+          "name": "Monthly",
+          "charts": ["Monthly overview", "Achievements"]
+        }
+      ],
+      "actions": [
+        {
+          "name": "View Detailed Stats",
+          "description": "Drill down into specific metrics"
+        },
+        {
+          "name": "Export Data",
+          "description": "Download health report"
+        }
+      ],
+      "navigation": {
+        "back": "3_main_dashboard",
+        "bottom_nav": "Available"
+      }
+    },
+    
+    "5_diet": {
+      "screen": "Diet Tracking",
+      "description": "Food logging with AI camera",
+      "features": {
+        "camera_scan": {
+          "description": "Take photo of food",
+          "action": "AI identifies food and calories",
+          "flow": [
+            "Open camera",
+            "Take photo",
+            "AI analyzes (2-3 seconds)",
+            "Shows: Food name, Calories, Protein, Carbs, Fats",
+            "User confirms or edits",
+            "Logs to daily intake"
+          ]
+        },
+        "manual_entry": {
+          "description": "Search and add food manually",
+          "action": "Search food database"
+        },
+        "meal_history": {
+          "description": "View logged meals",
+          "filters": ["Today", "Yesterday", "This Week"]
+        },
+        "nutrition_summary": {
+          "shows": ["Total calories", "Macros breakdown", "Goal progress"]
+        }
+      },
+      "navigation": {
+        "back": "3_main_dashboard",
+        "bottom_nav": "Available"
+      }
+    },
+    
+    "6_social": {
+      "screen": "Health Circles (Social)",
+      "description": "Connect with friends and family",
+      "features": {
+        "circles": {
+          "description": "Health groups you're part of",
+          "actions": [
+            "View circle members",
+            "See shared stats (if privacy allows)",
+            "Leaderboard",
+            "Challenges"
+          ]
+        },
+        "create_circle": {
+          "flow": [
+            "Click 'Create Circle'",
+            "Enter circle name",
+            "Set privacy settings",
+            "Invite members (share code)",
+            "Circle created"
+          ]
+        },
+        "join_circle": {
+          "flow": [
+            "Click 'Join Circle'",
+            "Enter invite code",
+            "Accept privacy terms",
+            "Joined successfully"
+          ]
+        },
+        "privacy_controls": {
+          "options": [
+            "Share steps only",
+            "Share all metrics",
+            "Share nothing (view only)"
+          ]
+        }
+      },
+      "navigation": {
+        "back": "3_main_dashboard",
+        "goto_circle_detail": "6a_circle_detail",
+        "bottom_nav": "Available"
+      }
+    },
+    
+    "6a_circle_detail": {
+      "screen": "Circle Detail",
+      "description": "Detailed view of a health circle",
+      "components": [
+        "Circle name and members",
+        "Leaderboard (steps/calories)",
+        "Active challenges",
+        "Shared achievements",
+        "Chat/Messages"
+      ],
+      "actions": [
+        {"name": "Leave Circle", "confirmation": true},
+        {"name": "Invite Members", "goto": "Share invite code"},
+        {"name": "View Member Profile", "goto": "Member stats"}
+      ],
+      "navigation": {
+        "back": "6_social"
+      }
+    },
+    
+    "7_mental_health": {
+      "screen": "Mental Wellness",
+      "description": "Mood tracking and stress management",
+      "features": {
+        "mood_logging": {
+          "description": "Log daily mood",
+          "options": ["Happy", "Sad", "Stressed", "Anxious", "Calm"],
+          "action": "Saves mood with timestamp"
+        },
+        "breathing_exercises": {
+          "types": [
+            "Box Breathing (4-4-4-4)",
+            "4-7-8 Relaxing Breath",
+            "Deep Breathing"
+          ],
+          "flow": [
+            "Select exercise",
+            "Follow animated guide",
+            "Complete session",
+            "Log stress level before/after"
+          ]
+        },
+        "meditation": {
+          "sessions": [
+            "Quick Stress Relief (5 min)",
+            "Sleep Meditation (10 min)",
+            "Focus Boost (7 min)"
+          ]
+        },
+        "mood_trends": {
+          "description": "View mood patterns over time",
+          "charts": ["Weekly mood", "Stress triggers"]
+        }
+      },
+      "navigation": {
+        "back": "3_main_dashboard",
+        "bottom_nav": "Available"
+      }
+    },
+    
+    "8_gamification": {
+      "screen": "Achievements & Badges",
+      "description": "Gamification features",
+      "components": {
+        "badges": {
+          "categories": [
+            "Steps (10K, 50K, 100K total)",
+            "Streaks (7 day, 30 day, 100 day)",
+            "Challenges (Complete 5, 10, 25)",
+            "Social (Join circle, Invite 5 friends)"
+          ],
+          "display": "Grid of locked/unlocked badges"
+        },
+        "current_streak": {
+          "description": "Days of consecutive goal completion",
+          "example": "🔥 15 Day Streak!"
+        },
+        "leaderboard": {
+          "types": ["Friends", "Global", "Circle"],
+          "metrics": ["Steps", "Calories", "Achievements"]
+        },
+        "challenges": {
+          "active": "Current challenges you're in",
+          "available": "Join new challenges",
+          "completed": "Past achievements"
+        }
+      },
+      "navigation": {
+        "back": "3_main_dashboard",
+        "goto_challenge": "8a_challenge_detail"
+      }
+    },
+    
+    "8a_challenge_detail": {
+      "screen": "Challenge Detail",
+      "description": "Specific challenge information",
+      "components": [
+        "Challenge name and description",
+        "Duration and deadline",
+        "Progress bar",
+        "Participants",
+        "Rewards (badges)"
+      ],
+      "actions": [
+        {"name": "Join Challenge", "if": "not joined"},
+        {"name": "Leave Challenge", "if": "joined"},
+        {"name": "View Leaderboard"}
+      ],
+      "navigation": {
+        "back": "8_gamification"
+      }
+    },
+    
+    "9_planning": {
+      "screen": "Personalized Plans",
+      "description": "AI-generated health plans",
+      "plan_types": {
+        "workout_plan": {
+          "description": "Personalized exercise routine",
+          "based_on": ["Fitness level", "Goals", "Available time"],
+          "example": "30-min HIIT, 3x/week",
+          "actions": [
+            "View plan details",
+            "Start workout",
+            "Mark as complete",
+            "Request new plan"
+          ]
+        },
+        "diet_plan": {
+          "description": "Meal suggestions",
+          "based_on": ["Dietary preferences", "Calorie goals", "Allergies"],
+          "example": "1800 cal/day, High protein",
+          "actions": [
+            "View meal plan",
+            "Log meal",
+            "Request alternatives"
+          ]
+        },
+        "hydration_plan": {
+          "description": "Water intake reminders",
+          "based_on": ["Weight", "Activity level"],
+          "example": "8 glasses/day, Reminders every 2 hours",
+          "actions": [
+            "Log water",
+            "Adjust reminders",
+            "View history"
+          ]
+        }
+      },
+      "navigation": {
+        "back": "3_main_dashboard",
+        "goto_workout": "9a_workout_detail"
+      }
+    },
+    
+    "9a_workout_detail": {
+      "screen": "Workout Session",
+      "description": "Active workout tracking",
+      "flow": [
+        "View exercise list",
+        "Start workout timer",
+        "Follow exercise instructions",
+        "Mark exercises complete",
+        "End workout",
+        "Log: Duration, Calories, Difficulty",
+        "Save to history"
+      ],
+      "navigation": {
+        "back": "9_planning"
+      }
+    },
+    
+    "10_triage": {
+      "screen": "Health Triage",
+      "description": "Symptom checker and medical help",
+      "features": {
+        "symptom_checker": {
+          "flow": [
+            "Select body part or search symptom",
+            "Answer questions about symptoms",
+            "AI analyzes severity",
+            "Shows: Possible conditions, Urgency level",
+            "Recommendations: Self-care, See doctor, Emergency"
+          ]
+        },
+        "find_doctor": {
+          "description": "Locate nearby healthcare",
+          "filters": ["Doctors", "Hospitals", "Pharmacies", "Clinics"],
+          "shows": ["Name", "Distance", "Rating", "Specialization"],
+          "actions": [
+            "Call",
+            "Get directions",
+            "View details"
+          ]
+        },
+        "emergency": {
+          "description": "Quick access to emergency services",
+          "action": "Call 911 or local emergency number"
+        }
+      },
+      "navigation": {
+        "back": "3_main_dashboard"
+      }
+    },
+    
+    "11_ai_chat": {
+      "screen": "AI Health Assistant",
+      "description": "Chat with AI for health advice",
+      "features": {
+        "text_chat": {
+          "description": "Type questions about health",
+          "examples": [
+            "How many steps did I walk today?",
+            "Give me diet advice",
+            "How can I improve my sleep?"
+          ],
+          "response": "AI answers with personalized data"
+        },
+        "voice_input": {
+          "description": "Speak to AI (if enabled)",
+          "action": "Voice-to-text conversion"
+        },
+        "voice_output": {
+          "description": "AI speaks responses",
+          "voice": "Indian male accent (Prabhat)"
+        },
+        "quick_suggestions": {
+          "description": "Pre-made question buttons",
+          "examples": [
+            "Show my health summary",
+            "How many calories today?",
+            "Give me health advice"
+          ]
+        }
+      },
+      "navigation": {
+        "back": "3_main_dashboard",
+        "minimize": "Floating avatar overlay"
+      }
+    },
+    
+    "12_medical": {
+      "screen": "Medical Records",
+      "description": "Health records and reminders",
+      "features": {
+        "medical_records": {
+          "types": [
+            "Prescriptions",
+            "Lab reports",
+            "Doctor visits",
+            "Vaccinations"
+          ],
+          "actions": [
+            "Add new record",
+            "View/Edit record",
+            "Delete record",
+            "Export as PDF"
+          ]
+        },
+        "medication_reminders": {
+          "description": "Set medicine reminders",
+          "flow": [
+            "Add medication",
+            "Set time and frequency",
+            "Enable notifications",
+            "Get reminders",
+            "Mark as taken"
+          ]
+        },
+        "health_reports": {
+          "description": "Generate health summary",
+          "includes": ["All metrics", "Trends", "Achievements"],
+          "action": "Export and share with doctor"
+        }
+      },
+      "navigation": {
+        "back": "3_main_dashboard",
+        "bottom_nav": "Available"
+      }
+    },
+    
+    "13_floating_avatar": {
+      "screen": "Overlay (System-wide)",
+      "description": "AI assistant accessible from anywhere",
+      "states": {
+        "minimized": {
+          "description": "Small floating button",
+          "position": "Bottom-right corner",
+          "action": "Tap to expand"
+        },
+        "expanded": {
+          "description": "Chat interface overlay",
+          "features": [
+            "Quick health stats",
+            "Voice commands",
+            "Text chat",
+            "Quick actions"
+          ],
+          "action": "Tap outside or close to minimize"
+        }
+      },
+      "permissions": {
+        "required": "Display over other apps",
+        "request_flow": [
+          "User taps AI button",
+          "If no permission: Show permission dialog",
+          "Redirect to system settings",
+          "User grants permission",
+          "Return to app",
+          "Avatar overlay starts"
+        ]
+      },
+      "navigation": {
+        "close": "Stops overlay service",
+        "minimize": "Collapses to small button"
+      }
+    }
+  },
+  
+  "common_actions": {
+    "notifications": {
+      "types": [
+        "Goal reminders (e.g., 'Only 2,000 steps to go!')",
+        "Medication reminders",
+        "Hydration reminders",
+        "Anomaly alerts (e.g., 'Heart rate unusually high')",
+        "Social updates (e.g., 'Friend completed a challenge')",
+        "Achievement unlocked"
+      ],
+      "action": "Tap notification to open relevant screen"
+    },
+    
+    "settings": {
+      "access": "Profile icon or menu",
+      "options": [
+        "Edit profile",
+        "Privacy settings",
+        "Notification preferences",
+        "Connected devices",
+        "Data sync",
+        "App permissions",
+        "About & Help",
+        "Logout"
+      ]
+    },
+    
+    "data_sync": {
+      "description": "Sync with Health Connect and Firebase",
+      "frequency": "Real-time or periodic",
+      "manual": "Pull to refresh on any screen"
+    }
+  },
+  
+  "navigation_summary": {
+    "bottom_nav_screens": [
+      "Home (Dashboard)",
+      "Diet",
+      "Mood (Mental Health)",
+      "Progress",
+      "Social",
+      "Medical"
+    ],
+    "quick_access_from_home": [
+      "Achievements (Gamification)",
+      "Plans (Planning)",
+      "Symptoms (Triage)"
+    ],
+    "floating_access": [
+      "AI Chat (from anywhere)"
+    ],
+    "deep_links": [
+      "Circle Detail (from Social)",
+      "Challenge Detail (from Gamification)",
+      "Workout Session (from Planning)"
+    ]
+  },
+  
+  "user_journey_examples": {
+    "example_1_new_user": {
+      "description": "First time user journey",
+      "flow": [
+        "1_app_launch → Splash",
+        "2_onboarding → Welcome screens",
+        "2_onboarding → Grant permissions",
+        "2_onboarding → Setup profile",
+        "3_main_dashboard → See health overview",
+        "5_diet → Log first meal with camera",
+        "3_main_dashboard → Check AI suggestions",
+        "11_ai_chat → Ask AI about health goals"
+      ]
+    },
+    
+    "example_2_daily_user": {
+      "description": "Regular user daily routine",
+      "flow": [
+        "1_app_launch → Splash",
+        "3_main_dashboard → Check today's stats",
+        "4_progress → View weekly trends",
+        "5_diet → Log breakfast with camera",
+        "9_planning → Start workout session",
+        "9a_workout_detail → Complete workout",
+        "3_main_dashboard → Log water intake",
+        "7_mental_health → Log mood",
+        "8_gamification → Check streak and badges"
+      ]
+    },
+    
+    "example_3_health_issue": {
+      "description": "User feeling unwell",
+      "flow": [
+        "3_main_dashboard → Tap 'Symptoms' card",
+        "10_triage → Enter symptoms",
+        "10_triage → AI suggests: See doctor",
+        "10_triage → Find nearby doctors",
+        "10_triage → Call doctor or get directions",
+        "12_medical → Add doctor visit record",
+        "12_medical → Set medication reminder"
+      ]
+    },
+    
+    "example_4_social_challenge": {
+      "description": "User joins friend challenge",
+      "flow": [
+        "Notification → 'Friend invited you to challenge'",
+        "6_social → View circles",
+        "6a_circle_detail → See challenge details",
+        "8_gamification → View all challenges",
+        "8a_challenge_detail → Join challenge",
+        "3_main_dashboard → Track progress",
+        "4_progress → Compare with friends",
+        "8_gamification → Complete challenge, earn badge"
+      ]
+    }
+  }
+}

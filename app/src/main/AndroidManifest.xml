@@ -24,6 +24,9 @@
     <!-- Camera permission for food tracking -->
     <uses-permission android:name="android.permission.CAMERA" />
 
+    <!-- Microphone permission for voice assistant -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <!-- Notification permission (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
@@ -58,6 +61,11 @@
         android:required="false" />
     <uses-feature
         android:name="android.hardware.camera.autofocus"
+        android:required="false" />
+    
+    <!-- Microphone feature for voice assistant -->
+    <uses-feature
+        android:name="android.hardware.microphone"
         android:required="false" />
 
     <application
@@ -159,6 +167,12 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="AI Health Assistant Overlay" />
         </service>
+        
+        <!-- Step Counter Foreground Service -->
+        <service
+            android:name=".service.step.StepCounterService"
+            android:exported="false"
+            android:foregroundServiceType="health" />
 
     </application>
 

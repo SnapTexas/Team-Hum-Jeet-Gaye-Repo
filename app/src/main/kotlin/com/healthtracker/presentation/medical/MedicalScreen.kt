@@ -1,10 +1,13 @@
 package com.healthtracker.presentation.medical
 
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,8 +25,10 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FilterList
@@ -66,17 +71,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.healthtracker.domain.model.HealthReminder
 import com.healthtracker.domain.model.MedicalRecord
 import com.healthtracker.domain.model.RecordType
 import com.healthtracker.domain.model.MedicalReminderType
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Main medical records and reminders screen.
@@ -94,6 +109,9 @@ fun MedicalScreen(
     var showUploadDialog by remember { mutableStateOf(false) }
     var showReminderDialog by remember { mutableStateOf(false) }
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
+    var showImageViewer by remember { mutableStateOf(false) }
+    var viewingRecord by remember { mutableStateOf<MedicalRecord?>(null) }
+    var imageContent by remember { mutableStateOf<ByteArray?>(null) }
     
     // File picker launcher
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -126,6 +144,10 @@ fun MedicalScreen(
                 is MedicalEvent.ReminderDeleted -> {
                     snackbarHostState.showSnackbar("Reminder deleted")
                 }
+                is MedicalEvent.RecordContentLoaded -> {
+                    imageContent = event.content
+                    showImageViewer = true
+                }
                 else -> {}
             }
         }
@@ -145,7 +167,8 @@ fun MedicalScreen(
                         MedicalTab.RECORDS -> filePickerLauncher.launch("*/*")
                         MedicalTab.REMINDERS -> showReminderDialog = true
                     }
-                }
+                },
+                modifier = Modifier.padding(bottom = 80.dp) // Avoid avatar overlay
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add")
             }
@@ -181,7 +204,10 @@ fun MedicalScreen(
                     isLoading = uiState.isLoadingRecords,
                     selectedType = uiState.selectedRecordType,
                     onTypeSelected = { viewModel.loadRecordsByType(it) },
-                    onRecordClick = { viewModel.viewRecordContent(it.id) },
+                    onRecordClick = { record ->
+                        viewingRecord = record
+                        viewModel.viewRecordContent(record.id)
+                    },
                     onDeleteRecord = { viewModel.deleteRecord(it.id) }
                 )
                 MedicalTab.REMINDERS -> RemindersContent(
@@ -214,8 +240,559 @@ fun MedicalScreen(
             onDismiss = { showReminderDialog = false },
             onCreate = { type, title, description, times, startDate, endDate, repeatType, daysOfWeek ->
                 viewModel.createReminder(type, title, description, times, startDate, endDate, repeatType, daysOfWeek)
+                showReminderDialog = false // Close dialog immediately after clicking Create
             }
         )
+    }
+    
+    // Image/Document Viewer Dialog
+    if (showImageViewer && viewingRecord != null) {
+        DocumentViewerDialog(
+            record = viewingRecord!!,
+            content = imageContent,
+            isLoading = uiState.isLoadingContent,
+            onDismiss = {
+                showImageViewer = false
+                viewingRecord = null
+                imageContent = null
+            }
+        )
+    }
+}
+
+@Composable
+private fun DocumentViewerDialog(
+    record: MedicalRecord,
+    content: ByteArray?,
+    isLoading: Boolean,
+    onDismiss: () -> Unit
+) {
+    var scale by remember { mutableStateOf(1f) }
+    var offsetX by remember { mutableStateOf(0f) }
+    var offsetY by remember { mutableStateOf(0f) }
+    
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.95f))
+        ) {
+            // Close button
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "Close",
+                    tint = Color.White,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+            
+            // Title
+            Text(
+                text = record.title,
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(16.dp)
+                    .padding(end = 48.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            
+            when {
+                isLoading -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center),
+                        color = Color.White
+                    )
+                }
+                content != null -> {
+                    val mimeType = record.mimeType.lowercase()
+                    val fileName = record.fileName.lowercase()
+                    
+                    when {
+                        // Images
+                        mimeType.startsWith("image/") || 
+                        fileName.endsWith(".jpg") || fileName.endsWith(".jpeg") ||
+                        fileName.endsWith(".png") || fileName.endsWith(".gif") ||
+                        fileName.endsWith(".webp") || fileName.endsWith(".bmp") -> {
+                            ImageViewer(
+                                content = content,
+                                title = record.title,
+                                scale = scale,
+                                offsetX = offsetX,
+                                offsetY = offsetY,
+                                onTransform = { newScale, newOffsetX, newOffsetY ->
+                                    scale = newScale
+                                    offsetX = newOffsetX
+                                    offsetY = newOffsetY
+                                },
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(top = 60.dp, bottom = 80.dp)
+                            )
+                        }
+                        
+                        // Text files
+                        mimeType.startsWith("text/") ||
+                        mimeType == "application/json" ||
+                        mimeType == "application/xml" ||
+                        fileName.endsWith(".txt") || fileName.endsWith(".json") ||
+                        fileName.endsWith(".xml") || fileName.endsWith(".csv") ||
+                        fileName.endsWith(".log") || fileName.endsWith(".md") ||
+                        fileName.endsWith(".html") || fileName.endsWith(".htm") -> {
+                            TextFileViewer(
+                                content = content,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(top = 60.dp, bottom = 80.dp)
+                            )
+                        }
+                        
+                        // PDF files
+                        mimeType == "application/pdf" || fileName.endsWith(".pdf") -> {
+                            PdfViewer(
+                                content = content,
+                                fileName = record.fileName,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(top = 60.dp, bottom = 80.dp)
+                            )
+                        }
+                        
+                        // Word documents
+                        mimeType == "application/msword" ||
+                        mimeType == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+                        fileName.endsWith(".doc") || fileName.endsWith(".docx") -> {
+                            DocumentInfoViewer(
+                                icon = Icons.Default.Description,
+                                fileName = record.fileName,
+                                fileType = "Word Document",
+                                fileSize = record.fileSizeBytes,
+                                message = "Word documents are securely stored.\nTap to export and open with external app.",
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        }
+                        
+                        // Excel files
+                        mimeType == "application/vnd.ms-excel" ||
+                        mimeType == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+                        fileName.endsWith(".xls") || fileName.endsWith(".xlsx") -> {
+                            DocumentInfoViewer(
+                                icon = Icons.Default.Description,
+                                fileName = record.fileName,
+                                fileType = "Excel Spreadsheet",
+                                fileSize = record.fileSizeBytes,
+                                message = "Spreadsheets are securely stored.\nTap to export and open with external app.",
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        }
+                        
+                        // Other files - show hex preview
+                        else -> {
+                            OtherFileViewer(
+                                content = content,
+                                fileName = record.fileName,
+                                mimeType = record.mimeType,
+                                fileSize = record.fileSizeBytes,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(top = 60.dp, bottom = 80.dp)
+                            )
+                        }
+                    }
+                }
+                else -> {
+                    Text(
+                        text = "Unable to load content",
+                        color = Color.White,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+            }
+            
+            // File info at bottom
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.8f))
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "${record.type.displayName()} • ${formatFileSize(record.fileSizeBytes)} • ${record.mimeType}",
+                    color = Color.White.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text(
+                    text = "Uploaded: ${record.uploadedAt.atZone(java.time.ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a"))}",
+                    color = Color.White.copy(alpha = 0.5f),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImageViewer(
+    content: ByteArray,
+    title: String,
+    scale: Float,
+    offsetX: Float,
+    offsetY: Float,
+    onTransform: (Float, Float, Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val bitmap = remember(content) {
+        BitmapFactory.decodeByteArray(content, 0, content.size)
+    }
+    
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = title,
+            modifier = modifier
+                .graphicsLayer(
+                    scaleX = scale,
+                    scaleY = scale,
+                    translationX = offsetX,
+                    translationY = offsetY
+                )
+                .pointerInput(Unit) {
+                    detectTransformGestures { _, pan, zoom, _ ->
+                        val newScale = (scale * zoom).coerceIn(0.5f, 5f)
+                        onTransform(newScale, offsetX + pan.x, offsetY + pan.y)
+                    }
+                },
+            contentScale = ContentScale.Fit
+        )
+    } else {
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+            Text(
+                text = "Unable to decode image",
+                color = Color.White
+            )
+        }
+    }
+}
+
+@Composable
+private fun TextFileViewer(
+    content: ByteArray,
+    modifier: Modifier = Modifier
+) {
+    val textContent = remember(content) {
+        try {
+            String(content, Charsets.UTF_8)
+        } catch (e: Exception) {
+            try {
+                String(content, Charsets.ISO_8859_1)
+            } catch (e2: Exception) {
+                "Unable to decode text content"
+            }
+        }
+    }
+    
+    LazyColumn(
+        modifier = modifier
+            .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(vertical = 8.dp)
+    ) {
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF1E1E1E)
+                ),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                SelectionContainer {
+                    Text(
+                        text = textContent,
+                        color = Color(0xFFD4D4D4),
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        ),
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PdfViewer(
+    content: ByteArray,
+    fileName: String,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    var pdfBitmaps by remember { mutableStateOf<List<android.graphics.Bitmap>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    
+    LaunchedEffect(content) {
+        isLoading = true
+        try {
+            val bitmaps = mutableListOf<android.graphics.Bitmap>()
+            val fileDescriptor = android.os.ParcelFileDescriptor.open(
+                java.io.File.createTempFile("temp_pdf", ".pdf", context.cacheDir).apply {
+                    writeBytes(content)
+                },
+                android.os.ParcelFileDescriptor.MODE_READ_ONLY
+            )
+            
+            val pdfRenderer = android.graphics.pdf.PdfRenderer(fileDescriptor)
+            val pageCount = pdfRenderer.pageCount.coerceAtMost(10) // Limit to 10 pages
+            
+            for (i in 0 until pageCount) {
+                val page = pdfRenderer.openPage(i)
+                val bitmap = android.graphics.Bitmap.createBitmap(
+                    page.width * 2,
+                    page.height * 2,
+                    android.graphics.Bitmap.Config.ARGB_8888
+                )
+                bitmap.eraseColor(android.graphics.Color.WHITE)
+                page.render(bitmap, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                bitmaps.add(bitmap)
+                page.close()
+            }
+            
+            pdfRenderer.close()
+            fileDescriptor.close()
+            pdfBitmaps = bitmaps
+            
+            if (pdfRenderer.pageCount > 10) {
+                errorMessage = "Showing first 10 of ${pdfRenderer.pageCount} pages"
+            }
+        } catch (e: Exception) {
+            errorMessage = "Unable to render PDF: ${e.message}"
+        }
+        isLoading = false
+    }
+    
+    Box(modifier = modifier) {
+        when {
+            isLoading -> {
+                Column(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    CircularProgressIndicator(color = Color.White)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Loading PDF...", color = Color.White)
+                }
+            }
+            pdfBitmaps.isNotEmpty() -> {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    if (errorMessage != null) {
+                        item {
+                            Text(
+                                text = errorMessage!!,
+                                color = Color.Yellow,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                    
+                    items(pdfBitmaps.size) { index ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Column {
+                                Image(
+                                    bitmap = pdfBitmaps[index].asImageBitmap(),
+                                    contentDescription = "Page ${index + 1}",
+                                    modifier = Modifier.fillMaxWidth(),
+                                    contentScale = ContentScale.FillWidth
+                                )
+                                Text(
+                                    text = "Page ${index + 1}",
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFF333333))
+                                        .padding(8.dp),
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            else -> {
+                Column(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        Icons.Default.PictureAsPdf,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(64.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = fileName,
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = errorMessage ?: "Unable to load PDF",
+                        color = Color.White.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DocumentInfoViewer(
+    icon: ImageVector,
+    fileName: String,
+    fileType: String,
+    fileSize: Long,
+    message: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(80.dp)
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        Text(
+            text = fileName,
+            color = Color.White,
+            style = MaterialTheme.typography.titleLarge,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "$fileType • ${formatFileSize(fileSize)}",
+            color = Color.White.copy(alpha = 0.7f),
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = message,
+            color = Color.White.copy(alpha = 0.5f),
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun OtherFileViewer(
+    content: ByteArray,
+    fileName: String,
+    mimeType: String,
+    fileSize: Long,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            Icons.Default.Description,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(64.dp)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = fileName,
+            color = Color.White,
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Type: $mimeType\nSize: ${formatFileSize(fileSize)}",
+            color = Color.White.copy(alpha = 0.7f),
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center
+        )
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        // Show hex preview for binary files
+        Text(
+            text = "File Preview (Hex)",
+            color = Color.White.copy(alpha = 0.5f),
+            style = MaterialTheme.typography.labelMedium
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            val hexPreview = remember(content) {
+                content.take(256).joinToString(" ") { byte ->
+                    String.format("%02X", byte)
+                }.chunked(48).joinToString("\n")
+            }
+            
+            Text(
+                text = hexPreview + if (content.size > 256) "\n..." else "",
+                color = Color(0xFF9CDCFE),
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                ),
+                modifier = Modifier.padding(16.dp)
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "File is securely stored and encrypted",
+            color = Color.White.copy(alpha = 0.5f),
+            style = MaterialTheme.typography.bodySmall
+        )
+    }
+}
+
+private fun formatFileSize(bytes: Long): String {
+    return when {
+        bytes < 1024 -> "$bytes B"
+        bytes < 1024 * 1024 -> "${bytes / 1024} KB"
+        else -> String.format("%.1f MB", bytes / (1024.0 * 1024.0))
     }
 }
 
@@ -228,12 +805,16 @@ private fun RecordsContent(
     onRecordClick: (MedicalRecord) -> Unit,
     onDeleteRecord: (MedicalRecord) -> Unit
 ) {
+    var showAddShortcutDialog by remember { mutableStateOf(false) }
+    var customShortcuts by remember { mutableStateOf(listOf<RecordType>()) }
+    
     Column(modifier = Modifier.fillMaxSize()) {
-        // Filter chips
+        // Filter chips - Only "All" by default, user can add more
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // All filter (always shown)
             item {
                 FilterChip(
                     selected = selectedType == null,
@@ -241,11 +822,34 @@ private fun RecordsContent(
                     label = { Text("All") }
                 )
             }
-            items(RecordType.entries) { type ->
+            
+            // Custom shortcuts added by user
+            items(customShortcuts) { type ->
                 FilterChip(
                     selected = selectedType == type,
                     onClick = { onTypeSelected(type) },
-                    label = { Text(type.displayName()) }
+                    label = { Text(type.displayName()) },
+                    trailingIcon = {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Remove",
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clickable { customShortcuts = customShortcuts - type }
+                        )
+                    }
+                )
+            }
+            
+            // Add shortcut button
+            item {
+                FilterChip(
+                    selected = false,
+                    onClick = { showAddShortcutDialog = true },
+                    label = { Text("+ Add") },
+                    leadingIcon = {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    }
                 )
             }
         }
@@ -277,6 +881,42 @@ private fun RecordsContent(
                 }
             }
         }
+    }
+    
+    // Add shortcut dialog
+    if (showAddShortcutDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddShortcutDialog = false },
+            title = { Text("Add Shortcut") },
+            text = {
+                Column {
+                    Text("Select record type to add as shortcut:", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    RecordType.entries.filter { it !in customShortcuts }.forEach { type ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    customShortcuts = customShortcuts + type
+                                    showAddShortcutDialog = false
+                                }
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(type.icon(), contentDescription = null)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(type.displayName())
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showAddShortcutDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
@@ -381,6 +1021,8 @@ private fun RemindersContent(
     onToggleEnabled: (String, Boolean) -> Unit,
     onDeleteReminder: (HealthReminder) -> Unit
 ) {
+    val context = LocalContext.current
+    
     if (isLoading) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -388,23 +1030,87 @@ private fun RemindersContent(
         ) {
             CircularProgressIndicator()
         }
-    } else if (reminders.isEmpty()) {
-        EmptyState(
-            icon = Icons.Default.Notifications,
-            title = "No Reminders",
-            message = "Tap + to create your first health reminder"
-        )
     } else {
         LazyColumn(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(reminders, key = { it.id }) { reminder ->
-                ReminderCard(
-                    reminder = reminder,
-                    onToggleEnabled = { onToggleEnabled(reminder.id, it) },
-                    onDelete = { onDeleteReminder(reminder) }
-                )
+            // Test Alarm Button at top
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            // Test the alarm
+                            val notificationService = com.healthtracker.service.notification.MedicalReminderNotificationService(context)
+                            notificationService.testAlarm()
+                        },
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Notifications,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "🔔 Test Alarm Sound",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
+                }
+            }
+            
+            if (reminders.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(300.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Notifications,
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "No Reminders",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Tap + to create your first health reminder",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+                }
+            } else {
+                items(reminders, key = { it.id }) { reminder ->
+                    ReminderCard(
+                        reminder = reminder,
+                        onToggleEnabled = { onToggleEnabled(reminder.id, it) },
+                        onDelete = { onDeleteReminder(reminder) }
+                    )
+                }
             }
         }
     }

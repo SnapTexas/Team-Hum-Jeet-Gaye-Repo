@@ -1,8 +1,12 @@
 package com.healthtracker.presentation.medical
 
 import android.content.ContentResolver
+import android.media.RingtoneManager
 import android.net.Uri
 import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,12 +17,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -31,6 +40,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -199,12 +209,20 @@ fun CreateReminderDialog(
         daysOfWeek: Set<DayOfWeek>?
     ) -> Unit
 ) {
+    val context = LocalContext.current
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var selectedType by remember { mutableStateOf(MedicalReminderType.MEDICINE) }
     var typeExpanded by remember { mutableStateOf(false) }
     var selectedRepeatType by remember { mutableStateOf(RepeatType.DAILY) }
     var repeatExpanded by remember { mutableStateOf(false) }
+    var selectedRingtoneUri by remember { 
+        mutableStateOf(
+            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        ) 
+    }
+    var ringtoneName by remember { mutableStateOf("Default Alarm") }
     
     val times = remember { mutableStateListOf(LocalTime.of(9, 0)) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -214,6 +232,28 @@ fun CreateReminderDialog(
         initialHour = 9,
         initialMinute = 0
     )
+    
+    // Ringtone picker launcher
+    val ringtonePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+        if (uri != null) {
+            selectedRingtoneUri = uri
+            val ringtone = RingtoneManager.getRingtone(context, uri)
+            ringtoneName = ringtone?.getTitle(context) ?: "Selected Ringtone"
+        }
+    }
+    
+    // Get initial ringtone name
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        try {
+            val ringtone = RingtoneManager.getRingtone(context, selectedRingtoneUri)
+            ringtoneName = ringtone?.getTitle(context) ?: "Default Alarm"
+        } catch (e: Exception) {
+            ringtoneName = "Default Alarm"
+        }
+    }
     
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -367,11 +407,68 @@ fun CreateReminderDialog(
                         Text("+ Add Time")
                     }
                 }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Ringtone Picker
+                Text(
+                    text = "Alarm Sound",
+                    style = MaterialTheme.typography.labelMedium
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            val intent = android.content.Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Select Alarm Sound")
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, selectedRingtoneUri)
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                            }
+                            ringtonePicker.launch(intent)
+                        },
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.MusicNote,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = ringtoneName,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = "Tap to change",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
+                    // Save ringtone preference
+                    val prefs = context.getSharedPreferences("reminder_settings", android.content.Context.MODE_PRIVATE)
+                    prefs.edit().putString("ringtone_uri", selectedRingtoneUri.toString()).apply()
+                    
                     onCreate(
                         selectedType,
                         title,

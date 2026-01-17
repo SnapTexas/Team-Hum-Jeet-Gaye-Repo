@@ -77,6 +77,9 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import com.healthtracker.core.sensor.StepCounterManager
+import com.healthtracker.core.sensor.SmartWatchManager
+import com.healthtracker.service.notification.MedicalReminderNotificationService
+import com.healthtracker.service.ai.LocalLLMService
 import kotlinx.serialization.json.Json
 import javax.inject.Singleton
 
@@ -234,15 +237,61 @@ object AppModule {
     }
     
     /**
+     * Provides SmartWatchManager for smartwatch integration.
+     */
+    @Provides
+    @Singleton
+    fun provideSmartWatchManager(
+        @ApplicationContext context: Context
+    ): SmartWatchManager {
+        return SmartWatchManager(context)
+    }
+    
+    /**
      * Provides StepCounterManager for live step counting from device sensor.
      * Uses the SAME sensor as Xiaomi App Vault!
+     * NOW WITH SMARTWATCH PRIORITY!
      */
     @Provides
     @Singleton
     fun provideStepCounterManager(
-        @ApplicationContext context: Context
+        @ApplicationContext context: Context,
+        smartWatchManager: SmartWatchManager
     ): StepCounterManager {
-        return StepCounterManager(context)
+        return StepCounterManager(context, smartWatchManager)
+    }
+    
+    /**
+     * Provides MedicalReminderNotificationService for scheduling medical reminders.
+     */
+    @Provides
+    @Singleton
+    fun provideMedicalReminderNotificationService(
+        @ApplicationContext context: Context
+    ): MedicalReminderNotificationService {
+        return MedicalReminderNotificationService(context)
+    }
+    
+    /**
+     * Provides LocalLLMService for on-device AI (Qwen 0.5B).
+     */
+    @Provides
+    @Singleton
+    fun provideLocalLLMService(
+        @ApplicationContext context: Context
+    ): LocalLLMService {
+        return LocalLLMService(context)
+    }
+    
+    /**
+     * Provides EdgeTTSService for natural voice output.
+     */
+    @Provides
+    @Singleton
+    fun provideEdgeTTSService(
+        @ApplicationContext context: Context
+    ): com.healthtracker.service.ai.EdgeTTSService {
+        return com.healthtracker.service.ai.EdgeTTSService(context)
     }
 }
 

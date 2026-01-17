@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -173,24 +174,6 @@ fun DietTrackingScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             DietTopBar(onNavigateBack = onNavigateBack)
-        },
-        floatingActionButton = {
-            if (!uiState.showCamera) {
-                FloatingActionButton(
-                    onClick = {
-                        if (hasCameraPermission) {
-                            viewModel.onShowCamera()
-                        } else {
-                            permissionLauncher.launch(Manifest.permission.CAMERA)
-                        }
-                    },
-                    containerColor = ElectricBlue,
-                    contentColor = Color.White,
-                    modifier = Modifier.shadow(8.dp, CircleShape)
-                ) {
-                    Icon(Icons.Default.CameraAlt, contentDescription = "Capture Food")
-                }
-            }
         }
     ) { padding ->
         Box(
@@ -207,19 +190,43 @@ fun DietTrackingScreen(
                     )
                 )
         ) {
-            if (uiState.showCamera) {
-                CameraViewfinder(
-                    onImageCaptured = { uri -> viewModel.onImageCaptured(uri) },
-                    onClose = { viewModel.onHideCamera() },
-                    isAnalyzing = uiState.isAnalyzing
-                )
-            } else {
-                DietDashboard(
-                    uiState = uiState,
-                    onSelectMealType = viewModel::onSelectMealType,
-                    onDeleteMeal = viewModel::onDeleteMeal,
-                    onManualEntry = { viewModel.onShowManualEntry() }
-                )
+            // Main content
+            Column(modifier = Modifier.fillMaxSize()) {
+                if (uiState.showCamera) {
+                    CameraViewfinder(
+                        onImageCaptured = { uri -> viewModel.onImageCaptured(uri) },
+                        onClose = { viewModel.onHideCamera() },
+                        isAnalyzing = uiState.isAnalyzing
+                    )
+                } else {
+                    DietDashboard(
+                        uiState = uiState,
+                        onSelectMealType = viewModel::onSelectMealType,
+                        onDeleteMeal = viewModel::onDeleteMeal,
+                        onManualEntry = { viewModel.onShowManualEntry() }
+                    )
+                }
+            }
+            
+            // Camera FAB - positioned above AI bot FAB
+            if (!uiState.showCamera) {
+                FloatingActionButton(
+                    onClick = {
+                        if (hasCameraPermission) {
+                            viewModel.onShowCamera()
+                        } else {
+                            permissionLauncher.launch(Manifest.permission.CAMERA)
+                        }
+                    },
+                    containerColor = ElectricBlue,
+                    contentColor = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = 96.dp)  // 96dp from bottom to avoid AI bot FAB
+                        .shadow(8.dp, CircleShape)
+                ) {
+                    Icon(Icons.Default.CameraAlt, contentDescription = "Capture Food")
+                }
             }
             
             // Result dialog

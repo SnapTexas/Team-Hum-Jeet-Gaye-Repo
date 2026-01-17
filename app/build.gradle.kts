@@ -23,6 +23,19 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        
+        // Read OpenAI API key from local.properties
+        val properties = org.jetbrains.kotlin.konan.properties.Properties()
+        val localPropertiesFile = rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            properties.load(localPropertiesFile.inputStream())
+        }
+        
+        buildConfigField(
+            "String",
+            "OPENAI_API_KEY",
+            "\"${properties.getProperty("OPENAI_API_KEY", "")}\""
+        )
     }
 
     buildTypes {
@@ -200,9 +213,14 @@ dependencies {
 
     // Networking
     implementation(libs.bundles.networking)
+    
+    // OkHttp for OpenAI API
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
     // Image Loading
     implementation(libs.coil.compose)
+    implementation("io.coil-kt:coil-gif:2.5.0")
 
     // Animation
     implementation(libs.lottie.compose)
@@ -223,6 +241,9 @@ dependencies {
     // Utilities
     implementation(libs.timber)
     implementation(libs.gson)
+    
+    // MediaPipe GenAI for Local LLM Inference
+    implementation("com.google.mediapipe:tasks-genai:0.10.22")
 
     // Testing
     testImplementation(libs.bundles.testing)

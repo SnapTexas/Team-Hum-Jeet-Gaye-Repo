@@ -5,10 +5,12 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -27,16 +29,29 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.DirectionsRun
 import androidx.compose.material.icons.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Nightlight
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -51,12 +66,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -66,6 +82,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.delay
+import com.healthtracker.domain.model.Achievement
 import com.healthtracker.domain.model.DailyAnalytics
 import com.healthtracker.domain.model.GoalProgress
 import com.healthtracker.domain.model.HealthGoal
@@ -81,6 +99,8 @@ import com.healthtracker.domain.model.WeeklyAnalytics
 import com.healthtracker.presentation.theme.CyberGreen
 import com.healthtracker.presentation.theme.ElectricBlue
 import com.healthtracker.presentation.theme.GlassSurface
+import com.healthtracker.presentation.theme.GlowWhite
+import com.healthtracker.presentation.theme.NeonPurple
 import com.healthtracker.presentation.theme.GlowWhite
 import com.healthtracker.presentation.theme.HealthTrackerTheme
 import com.healthtracker.presentation.theme.NeonPurple
@@ -141,21 +161,14 @@ private fun DashboardContent(
     onCompleteSuggestion: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val gradientBackground = Brush.verticalGradient(
-        colors = listOf(
-            Color(0xFF0D0D1A),
-            Color(0xFF1A1A2E),
-            Color(0xFF16213E)
-        )
-    )
+    // Clean solid dark background - premium formal look
+    val backgroundColor = Color(0xFF0D0D1A)
     
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(gradientBackground)
+            .background(backgroundColor)
     ) {
-        // Floating orb effects
-        FloatingOrbs()
         
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -216,6 +229,21 @@ private fun DashboardContent(
             // Content based on selected tab
             when (uiState.selectedTab) {
                 AnalyticsTab.DAILY -> {
+                    // TODAY'S ACHIEVEMENTS - TOP SECTION WITH REAL DATA
+                    item {
+                        TodayAchievementsOverview(
+                            steps = uiState.liveStepCount,
+                            calories = uiState.liveCalories,
+                            distance = uiState.liveDistance,
+                            stepGoal = uiState.dailyStepGoal,
+                            calorieGoal = uiState.dailyCalorieGoal,
+                            weeklyTotalSteps = uiState.weeklyTotalSteps,
+                            monthlyTotalSteps = uiState.monthlyTotalSteps,
+                            weeklyDaysWithData = uiState.weeklyDaysWithData,
+                            monthlyDaysWithData = uiState.monthlyDaysWithData
+                        )
+                    }
+                    
                     // User Profile Summary Card (shows personalized data)
                     if (uiState.userName.isNotEmpty()) {
                         item {
@@ -231,6 +259,17 @@ private fun DashboardContent(
                         }
                     }
                     
+                    // Gamification Summary Card - Temporarily disabled for build
+                    // uiState.userProgress?.let { progress ->
+                    //     item {
+                    //         GamificationSummaryCard(
+                    //             userProgress = progress,
+                    //             streaks = uiState.streaks,
+                    //             todayUnlockedCount = uiState.todayAchievements.count { it.badge.isUnlocked }
+                    //         )
+                    //     }
+                    // }
+                    
                     // Live Steps Card (from device sensor)
                     item {
                         LiveStepsCard(
@@ -241,6 +280,22 @@ private fun DashboardContent(
                             sensorStatus = uiState.sensorStatus
                         )
                     }
+                    
+                    // Heart Rate Card (from smartwatch or dummy data)
+                    item {
+                        HeartRateCard(
+                            heartRate = if (uiState.liveHeartRate > 0) uiState.liveHeartRate else 72,
+                            isLive = uiState.liveHeartRate > 0
+                        )
+                    }
+                    
+                    // Achievements Section - Temporarily disabled for build
+                    // item {
+                    //     AchievementsSection(
+                    //         todayAchievements = uiState.todayAchievements,
+                    //         userProgress = uiState.userProgress
+                    //     )
+                    // }
                     
                     // AI Suggestions section
                     if (uiState.suggestions.isNotEmpty()) {
@@ -307,12 +362,21 @@ private fun WeeklyStatsCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "📊 Weekly Summary",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.ShowChart,
+                        contentDescription = null,
+                        tint = ElectricBlue,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Weekly Summary",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
                 Text(
                     text = "$daysWithData days tracked",
                     style = MaterialTheme.typography.labelSmall,
@@ -335,9 +399,9 @@ private fun WeeklyStatsCard(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    StatItem("👟", "%,d".format(totalSteps), "Total Steps", ElectricBlue)
-                    StatItem("📈", "%,d".format(avgSteps), "Avg/Day", CyberGreen)
-                    StatItem("🎯", "${(avgSteps * 100 / stepGoal.coerceAtLeast(1))}%", "Goal", NeonPurple)
+                    IconStatItem(Icons.Default.DirectionsWalk, "%,d".format(totalSteps), "Total Steps", ElectricBlue)
+                    IconStatItem(Icons.Default.TrendingUp, "%,d".format(avgSteps), "Avg/Day", CyberGreen)
+                    IconStatItem(Icons.Default.Speed, "${(avgSteps * 100 / stepGoal.coerceAtLeast(1))}%", "Goal", NeonPurple)
                 }
                 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -346,8 +410,8 @@ private fun WeeklyStatsCard(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    StatItem("🔥", "%,d".format(totalCalories), "Calories", Color(0xFFFF6B6B))
-                    StatItem("📍", String.format("%.1f km", totalDistance / 1000), "Distance", Color(0xFF06B6D4))
+                    IconStatItem(Icons.Default.LocalFireDepartment, "%,d".format(totalCalories), "Calories", Color(0xFFFF6B6B))
+                    IconStatItem(Icons.Default.LocationOn, String.format("%.1f km", totalDistance / 1000), "Distance", Color(0xFF06B6D4))
                 }
             }
         }
@@ -377,12 +441,21 @@ private fun MonthlyStatsCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "📅 Monthly Summary",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Timeline,
+                        contentDescription = null,
+                        tint = NeonPurple,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Monthly Summary",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
                 Text(
                     text = "$daysWithData days tracked",
                     style = MaterialTheme.typography.labelSmall,
@@ -405,9 +478,9 @@ private fun MonthlyStatsCard(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    StatItem("👟", "%,d".format(totalSteps), "Total Steps", ElectricBlue)
-                    StatItem("📈", "%,d".format(avgSteps), "Avg/Day", CyberGreen)
-                    StatItem("🏆", "%,d".format(bestDaySteps), "Best Day", Color(0xFFF59E0B))
+                    IconStatItem(Icons.Default.DirectionsWalk, "%,d".format(totalSteps), "Total Steps", ElectricBlue)
+                    IconStatItem(Icons.Default.TrendingUp, "%,d".format(avgSteps), "Avg/Day", CyberGreen)
+                    IconStatItem(Icons.Default.EmojiEvents, "%,d".format(bestDaySteps), "Best Day", Color(0xFFF59E0B))
                 }
                 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -416,8 +489,8 @@ private fun MonthlyStatsCard(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    StatItem("🔥", "%,d".format(totalCalories), "Calories", Color(0xFFFF6B6B))
-                    StatItem("📍", String.format("%.1f km", totalDistance / 1000), "Distance", Color(0xFF06B6D4))
+                    IconStatItem(Icons.Default.LocalFireDepartment, "%,d".format(totalCalories), "Calories", Color(0xFFFF6B6B))
+                    IconStatItem(Icons.Default.LocationOn, String.format("%.1f km", totalDistance / 1000), "Distance", Color(0xFF06B6D4))
                 }
             }
         }
@@ -425,9 +498,14 @@ private fun MonthlyStatsCard(
 }
 
 @Composable
-private fun StatItem(icon: String, value: String, label: String, color: Color) {
+private fun IconStatItem(icon: ImageVector, value: String, label: String, color: Color) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = icon, fontSize = 24.sp)
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = color,
+            modifier = Modifier.size(24.dp)
+        )
         Text(
             text = value,
             style = MaterialTheme.typography.titleMedium,
@@ -461,6 +539,13 @@ private fun LiveStepsCard(
         else -> ElectricBlue
     }
     
+    // Animated progress
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(1000),
+        label = "progress"
+    )
+    
     GlassmorphicCard(
         modifier = Modifier.fillMaxWidth(),
         glowColor = progressColor
@@ -472,19 +557,33 @@ private fun LiveStepsCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text(
-                        text = "📱 Live Steps",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.DirectionsRun,
+                            contentDescription = null,
+                            tint = progressColor,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Live Steps",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
                     Text(
                         text = "From device sensor • $sensorStatus",
                         style = MaterialTheme.typography.labelSmall,
                         color = GlowWhite
                     )
                 }
-                Text(text = "👟", fontSize = 32.sp)
+                Icon(
+                    imageVector = Icons.Default.DirectionsWalk,
+                    contentDescription = null,
+                    tint = progressColor,
+                    modifier = Modifier.size(40.dp)
+                )
             }
             
             Spacer(modifier = Modifier.height(16.dp))
@@ -514,7 +613,7 @@ private fun LiveStepsCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(progress)
+                        .fillMaxWidth(animatedProgress)
                         .height(8.dp)
                         .clip(RoundedCornerShape(4.dp))
                         .background(progressColor)
@@ -523,13 +622,18 @@ private fun LiveStepsCard(
             
             Spacer(modifier = Modifier.height(12.dp))
             
-            // Calories and distance
+            // Calories, distance, and heart rate
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = "🔥", fontSize = 20.sp)
+                    Icon(
+                        imageVector = Icons.Default.LocalFireDepartment,
+                        contentDescription = null,
+                        tint = Color(0xFFFF6B6B),
+                        modifier = Modifier.size(24.dp)
+                    )
                     Text(
                         text = "$calories",
                         style = MaterialTheme.typography.titleMedium,
@@ -539,7 +643,12 @@ private fun LiveStepsCard(
                     Text(text = "kcal", style = MaterialTheme.typography.labelSmall, color = GlowWhite)
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = "📍", fontSize = 20.sp)
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = null,
+                        tint = ElectricBlue,
+                        modifier = Modifier.size(24.dp)
+                    )
                     Text(
                         text = String.format("%.1f", distance / 1000),
                         style = MaterialTheme.typography.titleMedium,
@@ -552,6 +661,599 @@ private fun LiveStepsCard(
         }
     }
 }
+
+/**
+ * Heart Rate Card showing live heart rate from smartwatch or dummy data.
+ */
+@Composable
+private fun HeartRateCard(
+    heartRate: Int,
+    isLive: Boolean
+) {
+    val heartColor = when {
+        heartRate < 60 -> Color(0xFF06B6D4) // Low - Cyan
+        heartRate < 100 -> CyberGreen // Normal - Green
+        heartRate < 120 -> Color(0xFFF59E0B) // Elevated - Orange
+        else -> Color(0xFFFF6B6B) // High - Red
+    }
+    
+    // Animated heart beat effect
+    val infiniteTransition = rememberInfiniteTransition(label = "heartbeat")
+    val heartScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(600),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "heartbeat"
+    )
+    
+    GlassmorphicCard(
+        modifier = Modifier.fillMaxWidth(),
+        glowColor = heartColor
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Favorite,
+                            contentDescription = null,
+                            tint = heartColor,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .scale(heartScale)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Heart Rate",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                    Text(
+                        text = if (isLive) "From smartwatch • Live" else "Dummy data",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = GlowWhite
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Default.Favorite,
+                    contentDescription = null,
+                    tint = heartColor,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .scale(heartScale)
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Big heart rate display
+            Row(
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "$heartRate",
+                    style = MaterialTheme.typography.displayLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = heartColor
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "BPM",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = GlowWhite,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Heart rate status
+            val statusText = when {
+                heartRate < 60 -> "Resting"
+                heartRate < 100 -> "Normal"
+                heartRate < 120 -> "Elevated"
+                else -> "High"
+            }
+            
+            Text(
+                text = statusText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = heartColor,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+            
+            if (!isLive) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Connect a smartwatch for live heart rate monitoring",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = GlowWhite.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Achievements Section - Shows real achievements based on actual step/calorie data
+ * Now integrated with gamification system!
+ * TEMPORARILY DISABLED FOR BUILD
+ */
+/*
+@Composable
+private fun AchievementsSection(
+    todayAchievements: List<Achievement>,
+    userProgress: UserProgress?
+) {
+    val unlockedCount = todayAchievements.count { it.badge.unlockedAt != null }
+    
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.EmojiEvents,
+                    contentDescription = null,
+                    tint = Color(0xFFFFD700),
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Today's Achievements",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = "$unlockedCount/${todayAchievements.size}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color(0xFFFFD700),
+                    fontWeight = FontWeight.Bold
+                )
+                userProgress?.let { progress ->
+                    Text(
+                        text = "Level ${progress.level} • ${progress.totalPoints} pts",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFFB0B0B0)
+                    )
+                }
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            itemsIndexed(todayAchievements) { index, achievement ->
+                val uiAchievement = achievement.toUIAchievement()
+                AchievementCard(
+                    achievement = uiAchievement,
+                    animationDelay = index * 100
+                )
+            }
+        }
+    }
+}
+
+/**
+ * UI Achievement data class for display purposes
+ */
+private data class UIAchievement(
+    val id: String,
+    val title: String,
+    val description: String,
+    val icon: ImageVector,
+    val color: Color,
+    val isUnlocked: Boolean,
+    val progress: Float, // 0-1
+    val pointsAwarded: Int
+)
+
+/**
+ * Converts domain Achievement to UI Achievement for display
+ */
+private fun Achievement.toUIAchievement(): UIAchievement {
+    val (icon, color) = when {
+        badge.name.contains("Steps", ignoreCase = true) -> Icons.Default.DirectionsWalk to Color(0xFF10B981)
+        badge.name.contains("1K", ignoreCase = true) -> Icons.Default.DirectionsWalk to ElectricBlue
+        badge.name.contains("5K", ignoreCase = true) -> Icons.Default.DirectionsRun to Color(0xFFF59E0B)
+        badge.name.contains("10K", ignoreCase = true) -> Icons.Default.EmojiEvents to Color(0xFFFFD700)
+        badge.name.contains("Goal", ignoreCase = true) -> Icons.Default.Star to NeonPurple
+        badge.name.contains("Calorie", ignoreCase = true) -> Icons.Default.LocalFireDepartment to Color(0xFFFF6B6B)
+        badge.name.contains("Fat", ignoreCase = true) -> Icons.Default.LocalFireDepartment to Color(0xFFFF4444)
+        badge.name.contains("Inferno", ignoreCase = true) -> Icons.Default.LocalFireDepartment to Color(0xFFFF0000)
+        badge.name.contains("KM", ignoreCase = true) -> Icons.Default.LocationOn to Color(0xFF06B6D4)
+        else -> Icons.Default.EmojiEvents to Color(0xFFFFD700)
+    }
+    
+    // Calculate progress based on badge requirement
+    val progress = if (badge.isUnlocked) 1f else {
+        // For now, we'll show 1f for unlocked, 0.5f for in progress
+        // In a real implementation, you'd track current values vs thresholds
+        0.5f
+    }
+    
+    return UIAchievement(
+        id = id,
+        title = badge.name,
+        description = badge.description,
+        icon = icon,
+        color = color,
+        isUnlocked = badge.isUnlocked,
+        progress = progress,
+        pointsAwarded = pointsAwarded
+    )
+}
+
+/**
+ * Achievement Card composable
+ */
+@Composable
+private fun AchievementCard(
+    achievement: UIAchievement,
+    animationDelay: Int = 0
+) {
+    var isVisible by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(Unit) {
+        delay(animationDelay.toLong())
+        isVisible = true
+    }
+    
+    // Pulse animation for unlocked achievements
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = if (achievement.isUnlocked) 1.05f else 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+    
+    // Glow animation
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = if (achievement.isUnlocked) 0.8f else 0.3f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glow"
+    )
+    
+    AnimatedVisibility(
+        visible = isVisible,
+        enter = fadeIn(tween(300)) + scaleIn(tween(300)) + slideInVertically(tween(300)) { it / 2 }
+    ) {
+        Card(
+            modifier = Modifier
+                .width(120.dp)
+                .scale(if (achievement.isUnlocked) pulseScale else 1f),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (achievement.isUnlocked) 
+                    achievement.color.copy(alpha = 0.15f) 
+                else 
+                    Color(0xFF1A1A2E)
+            ),
+            elevation = CardDefaults.cardElevation(
+                defaultElevation = if (achievement.isUnlocked) 8.dp else 2.dp
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Icon with glow effect
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (achievement.isUnlocked)
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        achievement.color.copy(alpha = glowAlpha),
+                                        achievement.color.copy(alpha = 0.1f)
+                                    )
+                                )
+                            else
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        Color.Gray.copy(alpha = 0.3f),
+                                        Color.Gray.copy(alpha = 0.1f)
+                                    )
+                                )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (achievement.isUnlocked) achievement.icon else Icons.Default.Lock,
+                        contentDescription = achievement.title,
+                        tint = if (achievement.isUnlocked) achievement.color else Color.Gray,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    text = achievement.title,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (achievement.isUnlocked) Color.White else Color.Gray,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1
+                )
+                
+                Text(
+                    text = achievement.description,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (achievement.isUnlocked) GlowWhite else Color.Gray.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    fontSize = 10.sp
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Progress bar
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(Color.White.copy(alpha = 0.1f))
+                ) {
+                    val animatedProgress by animateFloatAsState(
+                        targetValue = achievement.progress,
+                        animationSpec = tween(1000, delayMillis = animationDelay),
+                        label = "progress"
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(animatedProgress)
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(
+                                if (achievement.isUnlocked) achievement.color
+                                else Color.Gray
+                            )
+                    )
+                }
+                
+                // Progress text with points
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = if (achievement.isUnlocked) "✓ Unlocked" else "${(achievement.progress * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (achievement.isUnlocked) achievement.color else Color.Gray,
+                        fontWeight = if (achievement.isUnlocked) FontWeight.Bold else FontWeight.Normal,
+                        fontSize = 10.sp
+                    )
+                    if (achievement.isUnlocked && achievement.pointsAwarded > 0) {
+                        Text(
+                            text = "+${achievement.pointsAwarded} pts",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFFFFD700),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 9.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+*/
+
+/**
+ * Gamification Summary Card showing level, points, and active streaks
+ * TEMPORARILY DISABLED FOR BUILD
+ */
+/*
+@Composable
+private fun GamificationSummaryCard(
+    userProgress: UserProgress,
+    streaks: List<Streak>,
+    todayUnlockedCount: Int
+) {
+    val activeStreaks = streaks.filter { it.isActive }
+    val longestStreak = streaks.maxByOrNull { it.currentCount }
+    
+    GlassmorphicCard(
+        modifier = Modifier.fillMaxWidth(),
+        glowColor = NeonPurple
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.EmojiEvents,
+                        contentDescription = null,
+                        tint = Color(0xFFFFD700),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Your Progress",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+                
+                // Level badge
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = NeonPurple.copy(alpha = 0.2f)
+                    )
+                ) {
+                    Text(
+                        text = "Level ${userProgress.level}",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = NeonPurple,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Stats row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                // Total Points
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "${userProgress.totalPoints}",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFFD700)
+                    )
+                    Text(
+                        text = "Total Points",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = GlowWhite
+                    )
+                }
+                
+                // Active Streaks
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.LocalFireDepartment,
+                            contentDescription = null,
+                            tint = Color(0xFFFF6B6B),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "${activeStreaks.size}",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFFF6B6B)
+                        )
+                    }
+                    Text(
+                        text = "Active Streaks",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = GlowWhite
+                    )
+                }
+                
+                // Today's Achievements
+                Column(horizontalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "$todayUnlockedCount",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = CyberGreen
+                    )
+                    Text(
+                        text = "Today's Wins",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = GlowWhite
+                    )
+                }
+            }
+            
+            // Level progress bar
+            if (userProgress.level < 50) { // Show progress bar until max level
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Level Progress",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = GlowWhite
+                        )
+                        Text(
+                            text = "${userProgress.pointsToNextLevel} pts to next level",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFFFFD700)
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    LinearProgressIndicator(
+                        progress = { userProgress.levelProgress / 100f },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp)),
+                        color = NeonPurple,
+                        trackColor = Color.White.copy(alpha = 0.1f)
+                    )
+                }
+            }
+            
+            // Longest streak highlight
+            longestStreak?.let { streak ->
+                if (streak.longestCount > 0) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = null,
+                            tint = Color(0xFFFFD700),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Best streak: ${streak.longestCount} days",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFFFFD700),
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+*/
 
 /**
  * User Profile Card showing personalized goals based on onboarding data.
@@ -584,12 +1286,21 @@ private fun UserProfileCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text(
-                        text = "Hello, ${userName.split(" ").first()}! 👋",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Hello, ${userName.split(" ").first()}!",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            tint = ElectricBlue,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                     Text(
                         text = "Goal: $goal",
                         style = MaterialTheme.typography.bodyMedium,
@@ -626,16 +1337,16 @@ private fun UserProfileCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                GoalChip("🔥", "$calorieGoal", "kcal", Color(0xFFFF6B6B))
-                GoalChip("👟", "${stepGoal / 1000}k", "steps", ElectricBlue)
-                GoalChip("💧", String.format("%.1fL", waterGoal / 1000f), "water", Color(0xFF06B6D4))
+                IconGoalChip(Icons.Default.LocalFireDepartment, "$calorieGoal", "kcal", Color(0xFFFF6B6B))
+                IconGoalChip(Icons.Default.DirectionsWalk, "${stepGoal / 1000}k", "steps", ElectricBlue)
+                IconGoalChip(Icons.Default.WaterDrop, String.format("%.1fL", waterGoal / 1000f), "water", Color(0xFF06B6D4))
             }
         }
     }
 }
 
 @Composable
-private fun GoalChip(icon: String, value: String, label: String, color: Color) {
+private fun IconGoalChip(icon: ImageVector, value: String, label: String, color: Color) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -643,7 +1354,12 @@ private fun GoalChip(icon: String, value: String, label: String, color: Color) {
             .background(color.copy(alpha = 0.15f))
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        Text(text = icon, fontSize = 20.sp)
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = color,
+            modifier = Modifier.size(24.dp)
+        )
         Text(
             text = value,
             style = MaterialTheme.typography.titleMedium,
@@ -661,30 +1377,7 @@ private fun GoalChip(icon: String, value: String, label: String, color: Color) {
 
 @Composable
 private fun FloatingOrbs() {
-    Box(modifier = Modifier.fillMaxSize()) {
-        // Electric blue orb
-        Box(
-            modifier = Modifier
-                .size(200.dp)
-                .blur(80.dp)
-                .background(
-                    ElectricBlue.copy(alpha = 0.15f),
-                    CircleShape
-                )
-                .align(Alignment.TopEnd)
-        )
-        // Neon purple orb
-        Box(
-            modifier = Modifier
-                .size(150.dp)
-                .blur(60.dp)
-                .background(
-                    NeonPurple.copy(alpha = 0.12f),
-                    CircleShape
-                )
-                .align(Alignment.BottomStart)
-        )
-    }
+    // Removed - clean formal look
 }
 
 @Composable
@@ -807,28 +1500,14 @@ private fun GlassmorphicCard(
     glowColor: Color = ElectricBlue,
     content: @Composable () -> Unit
 ) {
+    // Premium formal card - clean solid look
     Card(
-        modifier = modifier
-            .shadow(
-                elevation = 8.dp,
-                shape = RoundedCornerShape(20.dp),
-                ambientColor = glowColor.copy(alpha = 0.3f),
-                spotColor = glowColor.copy(alpha = 0.3f)
-            )
-            .border(
-                width = 1.dp,
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        glowColor.copy(alpha = 0.5f),
-                        glowColor.copy(alpha = 0.1f)
-                    )
-                ),
-                shape = RoundedCornerShape(20.dp)
-            ),
-        shape = RoundedCornerShape(20.dp),
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = GlassSurface
-        )
+            containerColor = Color(0xFF1A1A2E)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         content()
     }
@@ -1497,6 +2176,307 @@ private fun MonthlyOverviewSection(
                 )
             }
         }
+    }
+}
+
+/**
+ * TODAY'S ACHIEVEMENTS OVERVIEW - Shows real-time progress, streaks, badges, leaderboard
+ */
+@Composable
+private fun TodayAchievementsOverview(
+    steps: Int,
+    calories: Int,
+    distance: Double,
+    stepGoal: Int,
+    calorieGoal: Int,
+    weeklyTotalSteps: Int,
+    monthlyTotalSteps: Int,
+    weeklyDaysWithData: Int,
+    monthlyDaysWithData: Int
+) {
+    val stepsProgress = (steps.toFloat() / stepGoal).coerceIn(0f, 1f)
+    val caloriesProgress = (calories.toFloat() / calorieGoal).coerceIn(0f, 1f)
+    
+    // Calculate streaks
+    val currentStreak = weeklyDaysWithData
+    val bestStreak = monthlyDaysWithData
+    
+    // Calculate badges unlocked
+    val badgesUnlocked = remember(steps, calories, distance) {
+        var count = 0
+        if (steps >= 100) count++
+        if (steps >= 1000) count++
+        if (steps >= 5000) count++
+        if (steps >= 10000) count++
+        if (calories >= 50) count++
+        if (calories >= 100) count++
+        if (distance >= 1000) count++
+        count
+    }
+    
+    GlassmorphicCard(
+        modifier = Modifier.fillMaxWidth(),
+        glowColor = NeonPurple
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.EmojiEvents,
+                        contentDescription = null,
+                        tint = Color(0xFFFFD700),
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Today's Achievements",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // 4 Main Stats Grid
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Progress
+                AchievementStatBox(
+                    icon = Icons.Default.TrendingUp,
+                    label = "Progress",
+                    value = "${(stepsProgress * 100).toInt()}%",
+                    color = ElectricBlue,
+                    modifier = Modifier.weight(1f)
+                )
+                
+                // Streaks
+                AchievementStatBox(
+                    icon = Icons.Default.LocalFireDepartment,
+                    label = "Streak",
+                    value = "$currentStreak days",
+                    color = Color(0xFFFF6B6B),
+                    modifier = Modifier.weight(1f)
+                )
+                
+                // Badges
+                AchievementStatBox(
+                    icon = Icons.Default.Star,
+                    label = "Badges",
+                    value = "$badgesUnlocked",
+                    color = Color(0xFFFFD700),
+                    modifier = Modifier.weight(1f)
+                )
+                
+                // Leaderboard
+                AchievementStatBox(
+                    icon = Icons.Default.EmojiEvents,
+                    label = "Rank",
+                    value = "#1",
+                    color = CyberGreen,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Detailed Stats Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Steps Progress
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.White.copy(alpha = 0.05f))
+                        .padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "%,d".format(steps),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = ElectricBlue
+                    )
+                    Text(
+                        text = "/ %,d steps".format(stepGoal),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = GlowWhite
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(Color.White.copy(alpha = 0.1f))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(stepsProgress)
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(ElectricBlue)
+                        )
+                    }
+                }
+                
+                // Calories Progress
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.White.copy(alpha = 0.05f))
+                        .padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "%,d".format(calories),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFF6B6B)
+                    )
+                    Text(
+                        text = "/ %,d kcal".format(calorieGoal),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = GlowWhite
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(Color.White.copy(alpha = 0.1f))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(caloriesProgress)
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(Color(0xFFFF6B6B))
+                        )
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Weekly & Monthly Stats
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Weekly
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.White.copy(alpha = 0.05f))
+                        .padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Weekly",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = GlowWhite
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "%,d".format(weeklyTotalSteps),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = CyberGreen
+                    )
+                    Text(
+                        text = "steps",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = GlowWhite.copy(alpha = 0.7f)
+                    )
+                }
+                
+                // Monthly
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.White.copy(alpha = 0.05f))
+                        .padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Monthly",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = GlowWhite
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "%,d".format(monthlyTotalSteps),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = NeonPurple
+                    )
+                    Text(
+                        text = "steps",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = GlowWhite.copy(alpha = 0.7f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Individual Achievement Stat Box
+ */
+@Composable
+private fun AchievementStatBox(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(color.copy(alpha = 0.1f))
+            .border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+            .padding(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = color,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = GlowWhite,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
